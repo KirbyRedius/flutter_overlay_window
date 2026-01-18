@@ -140,8 +140,12 @@ public class OverlayService extends Service implements View.OnTouchListener {
                 int height = call.argument("height");
                 boolean enableDrag = call.argument("enableDrag");
                 resizeOverlay(width, height, enableDrag, result);
+            } else if (call.method.equals("openMainApp")) {
+                intent.setClassName("com.karboworld.karbo", "com.karboworld.karbo.MainActivity");
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
             }
-        });
+        }); 
         overlayMessageChannel.setMessageHandler((message, reply) -> {
             WindowSetup.messenger.send(message);
         });
@@ -433,22 +437,56 @@ public class OverlayService extends Service implements View.OnTouchListener {
 
         public TrayAnimationTimerTask() {
             super();
-            mDestY = lastYPosition;
+
+            int left = 0;
+            int right = szWindow.x - flutterView.getWidth();
+            int top = 0 + mStatusBarHeight;
+            int bottom = szWindow.y - mNavigationBarHeight - flutterView.getHeight() / 4;
+
+            int regulateOffsetX = (szWindow.x - flutterView.getWidth()) / 2;
+            int regulateOffsetY = szWindow.y / 2;
+
+            // Solve the offset issue with including Gravity.CENTER setting
+            if (WindowSetup.gravity == (Gravity.TOP)
+                    || WindowSetup.gravity == (Gravity.CENTER)
+                    || WindowSetup.gravity == (Gravity.BOTTOM)) {
+                left = left - regulateOffsetX;
+                right = right - regulateOffsetX;
+            }
+            if (WindowSetup.gravity == (Gravity.LEFT | Gravity.CENTER)
+                    || WindowSetup.gravity == (Gravity.CENTER)
+                    || WindowSetup.gravity == (Gravity.RIGHT | Gravity.CENTER)) {
+                top = top - regulateOffsetY;
+                bottom = bottom - regulateOffsetY;
+            }
+
+            // Solve the slight offset issue with including Gravity.BOTTOM setting
+            if ((WindowSetup.gravity & Gravity.BOTTOM) == Gravity.BOTTOM) {
+                top = top - flutterView.getHeight() / 2;
+                bottom = bottom - flutterView.getHeight() / 2;
+            }
+
             switch (WindowSetup.positionGravity) {
                 case "auto":
-                    mDestX = (params.x + (flutterView.getWidth() / 2)) <= szWindow.x / 2 ? 0 : szWindow.x - flutterView.getWidth();
-                    return;
+                    mDestX = (params.x + (flutterView.getWidth() / 2)) <= right / 2 ? left : right;
+                    break;
                 case "left":
-                    mDestX = 0;
-                    return;
+                    mDestX = left;
+                    break;
                 case "right":
-                    mDestX = szWindow.x - flutterView.getWidth();
-                    return;
+                    mDestX = right;
+                    break;
                 default:
                     mDestX = params.x;
                     mDestY = params.y;
                     break;
             }
+            mDestY = lastYPosition;
+
+            // Solve the problem of floating window being able to move out of the viewport
+            mDestX = Math.max(left, Math.min(mDestX, right));
+            mDestY = Math.max(top, Math.min(mDestY, bottom));
+            return;
         }
 
         @Override
