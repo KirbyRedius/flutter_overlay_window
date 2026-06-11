@@ -1,3 +1,6 @@
+## 0.5.1
+- Добавлена проверка на null в OverlayService.onStartCommand на случай, если система перезапустит сервис с пустым Intent. Раньше из-за этого приложение падало на Android с NullPointerException на intent.getIntExtra.
+
 ## 0.5.0
 - Update gradle version
 - Fix `NullPointerException` in OverlayService

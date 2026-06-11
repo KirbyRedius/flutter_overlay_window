@@ -98,6 +98,19 @@ public class OverlayService extends Service implements View.OnTouchListener {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         mResources = getApplicationContext().getResources();
+        // Если сервис запущенный с START_STICKY убит системой 
+        // (из-за ошибок по типу нехватки памяти, OEM-убийцы и прочих)
+        // то Android может заново вызвать onStartCommand и уже с null-интентом.
+        // Без этой проверки следующий вызов intent.getIntExtra даст нам
+        // NullPointerException и сервис просто упадёт при рестарте.
+        // Без исходных параметров нам нечего делать и поэтому
+        // лучше всего просто остановиться чем дать процессу умереть.
+        if (intent == null) {
+            Log.w("OverlayService", "onStartCommand received null intent (sticky restart) - stopping service");
+            isRunning = false;
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         int startX = intent.getIntExtra("startX", OverlayConstants.DEFAULT_XY);
         int startY = intent.getIntExtra("startY", OverlayConstants.DEFAULT_XY);
         boolean isCloseWindow = intent.getBooleanExtra(INTENT_EXTRA_IS_CLOSE_WINDOW, false);
