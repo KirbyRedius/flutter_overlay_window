@@ -203,7 +203,36 @@ public class OverlayService extends Service implements View.OnTouchListener {
         }
         params.gravity = WindowSetup.gravity;
         flutterView.setOnTouchListener(this);
-        windowManager.addView(flutterView, params);
+        // WindowManager.addView() может вылететь на реальных устройствам по нескольким
+        // причинам, которые мы с нашей стороны плагина никак не можем контролировать:
+        //   - Разрешение SYSTEM_ALERT_WINDOW отозвали между тем моментом, когда
+        //     хост-приложение его проверило, и тем моментом, когда мы пытаемся добавить вьюху
+        //     (Android 12+ умеет делать это асинхронно).
+        //   - Дисплей куда-то делся (я хуй знает как это может произойти)
+        //   - Агрессивные OEM-ограничения на оверлеи (MIUI / EMUI / Honor) зарубают
+        //     запрос на системном уровне.
+        //   - DeadObjectException от system_server когда бинда-транзакция падает
+        //     (удалённый процесс похоже умер), который Google Play Console показывает как
+        //     "Adding window failed".
+        // Без этой защиты такие случаи просто роняют весь процесс вместо того чтобы
+        // контролируемо схлопнуть оверлей-сервис.
+        try {
+            windowManager.addView(flutterView, params);
+        } catch (Throwable t) {
+            Log.e("OverlayService", "Failed to add overlay view, stopping service", t);
+            try {
+                if (flutterView != null) {
+                    flutterView.detachFromFlutterEngine();
+                }
+            } catch (Throwable ignored) {
+
+            }
+            flutterView = null;
+            windowManager = null;
+            isRunning = false;
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         moveOverlay(dx, dy, null);
         return START_STICKY;
     }
