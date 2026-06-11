@@ -154,9 +154,20 @@ public class OverlayService extends Service implements View.OnTouchListener {
                 boolean enableDrag = call.argument("enableDrag");
                 resizeOverlay(width, height, enableDrag, result);
             } else if (call.method.equals("openMainApp")) {
-                intent.setClassName("com.karboworld.karbo", "com.karboworld.karbo.MainActivity");
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(intent);
+                Context ctx = getApplicationContext();
+                Intent launchIntent = ctx.getPackageManager()
+                        .getLaunchIntentForPackage(ctx.getPackageName());
+                if (launchIntent != null) {
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                    startActivity(launchIntent);
+                    result.success(true);
+                } else {
+                    Log.w("OverlayService",
+                            "openMainApp: no launcher activity for "
+                                    + ctx.getPackageName());
+                    result.success(false);
+                }
             }
         }); 
         overlayMessageChannel.setMessageHandler((message, reply) -> {
